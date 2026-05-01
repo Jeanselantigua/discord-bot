@@ -8,7 +8,7 @@ import google.generativeai as genai
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('models/gemini-2.5-flash')
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -16,6 +16,23 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents )
+
+MAX_DISCORD_MESSAGE_LENGTH = 2000
+
+def chunk_text(text, limit=MAX_DISCORD_MESSAGE_LENGTH):
+    chunks = []
+    while text:
+        if len(text) <= limit:
+            chunks.append(text)
+            break
+        split_at = text.rfind('\n', 0, limit)
+        if split_at == -1:
+            split_at = text.rfind(' ', 0, limit)
+        if split_at == -1:
+            split_at = limit
+        chunks.append(text[:split_at].rstrip())
+        text = text[split_at:].lstrip()
+    return chunks
 
 secretRole = "idk"
 userID = "narwhalez"
@@ -46,11 +63,16 @@ async def on_message(message):
     # Generate an insult if the set user sends a message
     if message.author.name == userID:
         try:
-            prompt = f"Generate a witty, clever insult in response to: {message.content}"
+            prompt = f"I want you to fact-check this response if there is anything i mention that is wrong i want you to nerd out and go on a small rant about how im wrong and correct me: {message.content}."
             response = model.generate_content(prompt)
-            await message.channel.send(response.text)
+            text = response.text or ""
+            if not text.strip():
+                raise ValueError('Empty response from Gemini')
+            for chunk in chunk_text(text):
+                await message.channel.send(chunk)
         except Exception as e:
-            await message.channel.send(f"Error generating insult: {str(e)}")
+            logging.exception('Gemini error while generating insult')
+            await message.channel.send("Error generating insult: API quota or request error.")
     
     await bot.process_commands(message)    
 
