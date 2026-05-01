@@ -3,9 +3,12 @@ from discord.ext import commands
 import logging
 from dotenv import load_dotenv
 import os   
+import google.generativeai as genai
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
+genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+model = genai.GenerativeModel('gemini-pro')
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -15,6 +18,7 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents )
 
 secretRole = "idk"
+userID = "narwhalez"
 
 @bot.event
 async def on_ready():
@@ -38,8 +42,27 @@ async def on_message(message):
     if "slowing hex" in message.content.lower():
         await message.delete()
         await message.channel.send(f"Hey {message.author.mention}, please refrain from talking about Slowing Hex.")
-
+    
+    # Generate an insult if the set user sends a message
+    if message.author.name == userID:
+        try:
+            prompt = f"Generate a witty, clever insult in response to: {message.content}"
+            response = model.generate_content(prompt)
+            await message.channel.send(response.text)
+        except Exception as e:
+            await message.channel.send(f"Error generating insult: {str(e)}")
+    
     await bot.process_commands(message)    
+
+# @bot.command()
+# async def insult(ctx, *, message):
+#     """Generate an insult based on the message"""
+#     try:
+#         prompt = f"Generate a witty, clever insult about this: {message}"
+#         response = model.generate_content(prompt)
+#         await ctx.send(response.text)
+#     except Exception as e:
+#         await ctx.send(f"Error: {str(e)}")
 
 # This is a simple command that responds with a greeting when a user types "!hello".
 @bot.command()
